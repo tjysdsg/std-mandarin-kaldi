@@ -2,8 +2,8 @@ import os
 from sklearn.model_selection import train_test_split
 
 
-datasets = ['aishell2', ]
-# data_roots = {'aishell2': '/NASdata/AudioData/mandarin/AISHELL-2/iOS/data'}
+datasets = ['aishell2', 'magicdata']
+spk_id_from_utt = {'aishell2': lambda x: x[1:6], 'magicdata': lambda x: x[:7]}
 
 wavscp = dict()
 trans = dict()
@@ -14,9 +14,8 @@ for d in datasets:
         for line in f:
             tokens = line.split()
             utt = tokens[0]
-#             wavscp[utt] = os.path.join(data_roots[d], tokens[1])
-            wavscp[utt] = tokens[1]
-            spk_id = utt[1:6]
+            wavscp[utt] = os.path.join('..', '..', d, tokens[1])
+            spk_id = spk_id_from_utt[d](utt)
             utt2spk[utt] = spk_id
 
     with open(os.path.join(d, 'trans_filtered.txt')) as f:
@@ -25,8 +24,8 @@ for d in datasets:
             trans[tokens[0]] = tokens[1]
 
 utts = list(wavscp.keys())
-train_utts, test_utts = train_test_split(utts, test_size=0.2, random_state=144)
-train_utts, dev_utts = train_test_split(train_utts, test_size=0.2, random_state=144)
+train_utts, test_utts = train_test_split(utts, test_size=0.1, random_state=144)
+train_utts, dev_utts = train_test_split(train_utts, test_size=0.1, random_state=144)
 
 data_utts = [train_utts, test_utts, dev_utts]
 
