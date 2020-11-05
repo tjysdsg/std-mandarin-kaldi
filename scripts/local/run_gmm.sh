@@ -4,7 +4,7 @@ set -e
 
 # number of jobs
 nj=20
-stage=1
+stage=2
 
 . ./cmd.sh
 [ -f ./path.sh ] && . ./path.sh;

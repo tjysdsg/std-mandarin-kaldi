@@ -18,8 +18,8 @@
 
 set -e
 
-stage=0
-train_stage=-10
+stage=8
+train_stage=335
 affix=
 common_egs_dir=
 
@@ -28,7 +28,7 @@ initial_effective_lrate=0.0015
 final_effective_lrate=0.00015
 num_epochs=4
 num_jobs_initial=2
-num_jobs_final=6
+num_jobs_final=2
 nj=30
 remove_egs=true
 
