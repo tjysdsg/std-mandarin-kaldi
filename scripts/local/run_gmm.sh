@@ -4,7 +4,7 @@ set -e
 
 # number of jobs
 nj=20
-stage=2
+stage=1
 
 . ./cmd.sh
 [ -f ./path.sh ] && . ./path.sh;
@@ -34,8 +34,7 @@ fi
 # mono
 if [ $stage -le 2 ]; then
   # training
-  steps/train_mono.sh --cmd "$train_cmd" --nj $nj \
-    data/train_100k data/lang exp/mono || exit 1;
+  steps/train_mono.sh --cmd "$train_cmd" --nj $nj data/train_100k data/lang exp/mono || exit 1;
 
   # decoding
   utils/mkgraph.sh data/lang_test exp/mono exp/mono/graph || exit 1;
@@ -45,15 +44,13 @@ if [ $stage -le 2 ]; then
     exp/mono/graph data/test exp/mono/decode_test
   
   # alignment
-  steps/align_si.sh --cmd "$train_cmd" --nj $nj \
-    data/train_300k data/lang exp/mono exp/mono_ali || exit 1;
+  steps/align_si.sh --cmd "$train_cmd" --nj $nj data/train_300k data/lang exp/mono exp/mono_ali || exit 1;
 fi
 
 # tri1
 if [ $stage -le 3 ]; then
   # training
-  steps/train_deltas.sh --cmd "$train_cmd" \
-   4000 32000 data/train_300k data/lang exp/mono_ali exp/tri1 || exit 1;
+  steps/train_deltas.sh --cmd "$train_cmd" 2500 20000 data/train_300k data/lang exp/mono_ali exp/tri1 || exit 1;
   
   # decoding
   utils/mkgraph.sh data/lang_test exp/tri1 exp/tri1/graph || exit 1;
@@ -63,15 +60,13 @@ if [ $stage -le 3 ]; then
     exp/tri1/graph data/test exp/tri1/decode_test
   
   # alignment
-  steps/align_si.sh --cmd "$train_cmd" --nj $nj \
-    data/train data/lang exp/tri1 exp/tri1_ali || exit 1;
+  steps/align_si.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri1 exp/tri1_ali || exit 1;
 fi
 
 # tri2
 if [ $stage -le 4 ]; then
   # training
-  steps/train_deltas.sh --cmd "$train_cmd" \
-   7000 56000 data/train data/lang exp/tri1_ali exp/tri2 || exit 1;
+  steps/train_deltas.sh --cmd "$train_cmd" 2500 20000 data/train data/lang exp/tri1_ali exp/tri2 || exit 1;
 
   # decoding
   utils/mkgraph.sh data/lang_test exp/tri2 exp/tri2/graph
@@ -81,15 +76,13 @@ if [ $stage -le 4 ]; then
     exp/tri2/graph data/test exp/tri2/decode_test
   
   # alignment
-  steps/align_si.sh --cmd "$train_cmd" --nj $nj \
-    data/train data/lang exp/tri2 exp/tri2_ali || exit 1;
+  steps/align_si.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri2 exp/tri2_ali || exit 1;
 fi
 
 # tri3
 if [ $stage -le 5 ]; then
   # training [LDA+MLLT]
-  steps/train_lda_mllt.sh --cmd "$train_cmd" \
-   10000 80000 data/train data/lang exp/tri2_ali exp/tri3 || exit 1;
+  steps/train_lda_mllt.sh --cmd "$train_cmd" 2500 20000 data/train data/lang exp/tri2_ali exp/tri3 || exit 1;
 
   # decoding
   utils/mkgraph.sh data/lang_test exp/tri3 exp/tri3/graph || exit 1;
@@ -98,14 +91,58 @@ if [ $stage -le 5 ]; then
   steps/decode.sh --cmd "$decode_cmd" --nj ${test_nj} --config conf/decode.conf \
     exp/tri3/graph data/test exp/tri3/decode_test
   
-  # alignment
-  steps/align_si.sh --cmd "$train_cmd" --nj $nj \
-    data/train data/lang exp/tri3 exp/tri3_ali || exit 1;
-  
-  steps/align_si.sh --cmd "$train_cmd" --nj ${nj} \
-    data/dev data/lang exp/tri3 exp/tri3_ali_dev || exit 1;
+  # FMLLR alignment
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri3 exp/tri3_ali || exit 1;
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj ${nj} data/dev data/lang exp/tri3 exp/tri3_ali_dev || exit 1;
 fi
+
+# Add SAT and use FMLLR from now on
+
+# tri4
+if [ $stage -le 6 ]; then
+  # training [LDA+MLLT+SAT]
+  steps/train_sat.sh --cmd "$train_cmd" 2500 20000 data/train data/lang exp/tri3_ali exp/tri4 || exit 1;
+
+  # decoding
+  utils/mkgraph.sh data/lang_test exp/tri4 exp/tri4/graph || exit 1;
+  steps/decode.sh --cmd "$decode_cmd" --nj ${dev_nj} --config conf/decode.conf exp/tri4/graph data/dev exp/tri4/decode_dev
+  steps/decode.sh --cmd "$decode_cmd" --nj ${test_nj} --config conf/decode.conf exp/tri4/graph data/test exp/tri4/decode_test
+  
+  # FMLLR alignment
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri4 exp/tri4_ali || exit 1;
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj ${nj} data/dev data/lang exp/tri4 exp/tri4_ali_dev || exit 1;
+fi
+
+# tri5
+if [ $stage -le 7 ]; then
+  # training [LDA+MLLT+SAT]
+  steps/train_sat.sh --cmd "$train_cmd" 3500 100000 data/train data/lang exp/tri4_ali exp/tri5 || exit 1;
+
+  # decoding
+  utils/mkgraph.sh data/lang_test exp/tri5 exp/tri5/graph || exit 1;
+  steps/decode.sh --cmd "$decode_cmd" --nj ${dev_nj} --config conf/decode.conf exp/tri5/graph data/dev exp/tri5/decode_dev
+  steps/decode.sh --cmd "$decode_cmd" --nj ${test_nj} --config conf/decode.conf exp/tri5/graph data/test exp/tri5/decode_test
+  
+  # FMLLR alignment
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri5 exp/tri5_ali || exit 1;
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj ${nj} data/dev data/lang exp/tri5 exp/tri5_ali_dev || exit 1;
+fi
+
+# tri6
+if [ $stage -le 8 ]; then
+  # training [LDA+MLLT+SAT]
+  steps/train_sat.sh --cmd "$train_cmd" 10000 100000 data/train data/lang exp/tri5_ali exp/tri6 || exit 1;
+
+  # decoding
+  utils/mkgraph.sh data/lang_test exp/tri6 exp/tri6/graph || exit 1;
+  steps/decode.sh --cmd "$decode_cmd" --nj ${dev_nj} --config conf/decode.conf exp/tri6/graph data/dev exp/tri6/decode_dev
+  steps/decode.sh --cmd "$decode_cmd" --nj ${test_nj} --config conf/decode.conf exp/tri6/graph data/test exp/tri6/decode_test
+
+  # FMLLR alignment
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj $nj data/train data/lang exp/tri6 exp/tri6_ali || exit 1;
+  steps/align_fmllr.sh --cmd "$train_cmd" --nj ${nj} data/dev data/lang exp/tri6 exp/tri6_ali_dev || exit 1;
+fi
+
 
 echo "local/run_gmm.sh succeeded"
 exit 0;
-

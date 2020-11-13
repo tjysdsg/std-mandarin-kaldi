@@ -5,8 +5,8 @@ dev_set=$(pwd)/../data/dev
 tst_set=$(pwd)/../data/test
 
 nj=20
-stage=3
-gmm_stage=1
+stage=2
+gmm_stage=2
 
 . ./cmd.sh
 . ./path.sh
@@ -23,9 +23,9 @@ if [ $stage -le 2 ]; then
 fi
 
 # tdnn
-if [ $stage -le 3 ]; then
-  local/nnet3/run_tdnn.sh --nj $nj
-fi
+# if [ $stage -le 3 ]; then
+#   local/nnet3/run_tdnn.sh --nj $nj
+# fi
 
 local/show_results.sh
 
