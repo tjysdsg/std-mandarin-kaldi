@@ -1,21 +1,12 @@
 #!/bin/bash
 
-# this is the original baseline scripts, which is supposed to be deprecated.
-
-# results
-# local/chain/compare_wer.sh exp/chain/tdnn_1a_sp/
-# Model                tdnn_1a_sp
-# WER(%)                     9.89
-# Final train prob        -0.0653
-# Final valid prob        -0.0765
-# Final train prob (xent)   -0.7340
-# Final valid prob (xent)   -0.8030
+# This script is based on run_tdnn_7h.sh in swbd chain recipe.
 
 set -e
 
 # configs for 'chain'
 affix=
-stage=10
+stage=0
 train_stage=-10
 get_egs_stage=-10
 dir=exp/chain/tdnn_1a  # Note: _sp will get added to this
@@ -28,8 +19,7 @@ final_effective_lrate=0.0001
 max_param_change=2.0
 final_layer_normalize_target=0.5
 num_jobs_initial=2
-num_jobs_final=4
-nj=10
+num_jobs_final=12
 minibatch_size=128
 frames_per_eg=150,110,90
 remove_egs=true
@@ -51,32 +41,28 @@ where "nvcc" is installed.
 EOF
 fi
 
-# we use 40-dim high-resolution mfcc features (w/o pitch and ivector) for nn training
-# no utt- and spk- level cmvn
+# The iVector-extraction and feature-dumping parts are the same as the standard
+# nnet3 setup, and you can skip them by setting "--stage 8" if you have already
+# run those things.
 
 dir=${dir}${affix:+_$affix}_sp
-train_set=train
-test_sets="dev test"
-ali_dir=exp/tri3_ali
-treedir=exp/chain/tri4_cd_tree_sp
+train_set=train_sp
+ali_dir=exp/tri5a_sp_ali
+treedir=exp/chain/tri6_7d_tree_sp
 lang=data/lang_chain
 
-if [ $stage -le 6 ]; then
-  mfccdir=mfcc_hires
-  for datadir in ${train_set} ${test_sets}; do
-  	utils/copy_data_dir.sh data/${datadir} data/${datadir}_hires
-	utils/data/perturb_data_dir_volume.sh data/${datadir}_hires || exit 1;
-	steps/make_mfcc.sh --mfcc-config conf/mfcc_hires.conf --nj $nj data/${datadir}_hires exp/make_mfcc/ ${mfccdir}
-  done
-fi
+
+# if we are using the speed-perturbed data we need to generate
+# alignments for it.
+local/nnet3/run_ivector_common.sh --stage $stage || exit 1;
 
 if [ $stage -le 7 ]; then
   # Get the alignments as lattices (gives the LF-MMI training more freedom).
   # use the same num-jobs as the alignments
   nj=$(cat $ali_dir/num_jobs) || exit 1;
   steps/align_fmllr_lats.sh --nj $nj --cmd "$train_cmd" data/$train_set \
-    data/lang exp/tri3 exp/tri4_sp_lats
-  rm exp/tri4_sp_lats/fsts.*.gz # save space
+    data/lang exp/tri5a exp/tri5a_sp_lats
+  rm exp/tri5a_sp_lats/fsts.*.gz # save space
 fi
 
 if [ $stage -le 8 ]; then
@@ -102,63 +88,57 @@ fi
 
 if [ $stage -le 10 ]; then
   echo "$0: creating neural net configs using the xconfig parser";
-  num_targets=$(tree-info $treedir/tree | grep num-pdfs | awk '{print $2}')
+
+  num_targets=$(tree-info $treedir/tree |grep num-pdfs|awk '{print $2}')
   learning_rate_factor=$(echo "print (0.5/$xent_regularize)" | python)
-  opts="l2-regularize=0.002"
-  linear_opts="orthonormal-constraint=1.0"
-  output_opts="l2-regularize=0.0005 bottleneck-dim=256"
 
   mkdir -p $dir/configs
   cat <<EOF > $dir/configs/network.xconfig
-  input dim=40 name=input
+  input dim=100 name=ivector
+  input dim=43 name=input
 
   # please note that it is important to have input layer with the name=input
   # as the layer immediately preceding the fixed-affine-layer to enable
   # the use of short notation for the descriptor
-  fixed-affine-layer name=lda input=Append(-2,-1,0,1,2) affine-transform-file=$dir/configs/lda.mat
+  fixed-affine-layer name=lda input=Append(-1,0,1,ReplaceIndex(ivector, t, 0)) affine-transform-file=$dir/configs/lda.mat
 
   # the first splicing is moved before the lda layer, so no splicing here
-  relu-batchnorm-layer name=tdnn1 $opts dim=1280
-  linear-component name=tdnn2l dim=256 $linear_opts input=Append(-1,0)
-  relu-batchnorm-layer name=tdnn2 $opts input=Append(0,1) dim=1280
-  linear-component name=tdnn3l dim=256 $linear_opts
-  relu-batchnorm-layer name=tdnn3 $opts dim=1280
-  linear-component name=tdnn4l dim=256 $linear_opts input=Append(-1,0)
-  relu-batchnorm-layer name=tdnn4 $opts input=Append(0,1) dim=1280
-  linear-component name=tdnn5l dim=256 $linear_opts
-  relu-batchnorm-layer name=tdnn5 $opts dim=1280 input=Append(tdnn5l, tdnn3l)
-  linear-component name=tdnn6l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn6 $opts input=Append(0,3) dim=1280
-  linear-component name=tdnn7l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn7 $opts input=Append(0,3,tdnn6l,tdnn4l,tdnn2l) dim=1280
-  linear-component name=tdnn8l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn8 $opts input=Append(0,3) dim=1280
-  linear-component name=tdnn9l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn9 $opts input=Append(0,3,tdnn8l,tdnn6l,tdnn4l) dim=1280
-  linear-component name=tdnn10l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn10 $opts input=Append(0,3) dim=1280
-  linear-component name=tdnn11l dim=256 $linear_opts input=Append(-3,0)
-  relu-batchnorm-layer name=tdnn11 $opts input=Append(0,3,tdnn10l,tdnn8l,tdnn6l) dim=1280
-  linear-component name=prefinal-l dim=256 $linear_opts
+  relu-batchnorm-layer name=tdnn1 dim=625
+  relu-batchnorm-layer name=tdnn2 input=Append(-1,0,1) dim=625
+  relu-batchnorm-layer name=tdnn3 input=Append(-1,0,1) dim=625
+  relu-batchnorm-layer name=tdnn4 input=Append(-3,0,3) dim=625
+  relu-batchnorm-layer name=tdnn5 input=Append(-3,0,3) dim=625
+  relu-batchnorm-layer name=tdnn6 input=Append(-3,0,3) dim=625
 
-  relu-batchnorm-layer name=prefinal-chain input=prefinal-l $opts dim=1280
-  output-layer name=output include-log-softmax=false dim=$num_targets $output_opts
+  ## adding the layers for chain branch
+  relu-batchnorm-layer name=prefinal-chain input=tdnn6 dim=625 target-rms=0.5
+  output-layer name=output include-log-softmax=false dim=$num_targets max-change=1.5
 
-  relu-batchnorm-layer name=prefinal-xent input=prefinal-l $opts dim=1280
-  output-layer name=output-xent dim=$num_targets learning-rate-factor=$learning_rate_factor $output_opts
+  # adding the layers for xent branch
+  # This block prints the configs for a separate output that will be
+  # trained with a cross-entropy objective in the 'chain' models... this
+  # has the effect of regularizing the hidden parts of the model.  we use
+  # 0.5 / args.xent_regularize as the learning rate factor- the factor of
+  # 0.5 / args.xent_regularize is suitable as it means the xent
+  # final-layer learns at a rate independent of the regularization
+  # constant; and the 0.5 was tuned so as to make the relative progress
+  # similar in the xent and regular final layers.
+  relu-batchnorm-layer name=prefinal-xent input=tdnn6 dim=625 target-rms=0.5
+  output-layer name=output-xent dim=$num_targets learning-rate-factor=$learning_rate_factor max-change=1.5
 
 EOF
   steps/nnet3/xconfig_to_configs.py --xconfig-file $dir/configs/network.xconfig --config-dir $dir/configs/
 fi
 
 if [ $stage -le 11 ]; then
-  #if [[ $(hostname -f) == *.clsp.jhu.edu ]] && [ ! -d $dir/egs/storage ]; then
-  #  utils/create_split_dir.pl \
-  #   /export/b0{5,6,7,8}/$USER/kaldi-data/egs/aishell-$(date +'%m_%d_%H_%M')/s5c/$dir/egs/storage $dir/egs/storage
-  #fi
+  if [[ $(hostname -f) == *.clsp.jhu.edu ]] && [ ! -d $dir/egs/storage ]; then
+    utils/create_split_dir.pl \
+     /export/b0{5,6,7,8}/$USER/kaldi-data/egs/aishell-$(date +'%m_%d_%H_%M')/s5c/$dir/egs/storage $dir/egs/storage
+  fi
 
   steps/nnet3/chain/train.py --stage $train_stage \
     --cmd "$decode_cmd" \
+    --feat.online-ivector-dir exp/nnet3/ivectors_${train_set} \
     --feat.cmvn-opts "--norm-means=false --norm-vars=false" \
     --chain.xent-regularize $xent_regularize \
     --chain.leaky-hmm-coefficient 0.1 \
@@ -180,7 +160,7 @@ if [ $stage -le 11 ]; then
     --cleanup.remove-egs $remove_egs \
     --feat-dir data/${train_set}_hires \
     --tree-dir $treedir \
-    --lat-dir exp/tri4_sp_lats \
+    --lat-dir exp/tri5a_sp_lats \
     --dir $dir  || exit 1;
 fi
 
@@ -193,12 +173,12 @@ fi
 
 graph_dir=$dir/graph
 if [ $stage -le 13 ]; then
-  for test_set in $test_sets; do
+  for test_set in dev test; do
     steps/nnet3/decode.sh --acwt 1.0 --post-decode-acwt 10.0 \
       --nj 10 --cmd "$decode_cmd" \
+      --online-ivector-dir exp/nnet3/ivectors_$test_set \
       $graph_dir data/${test_set}_hires $dir/decode_${test_set} || exit 1;
   done
 fi
 
-echo "local/chain/run_tdnn.sh succeeded"
-exit 0;
+exit;

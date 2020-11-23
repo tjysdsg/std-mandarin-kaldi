@@ -1,4 +1,3 @@
 data/
 exp/
-mfcc/
-mfcc_hires/
+mfcc*/

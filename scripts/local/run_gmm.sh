@@ -143,6 +143,5 @@ if [ $stage -le 8 ]; then
   steps/align_fmllr.sh --cmd "$train_cmd" --nj ${nj} data/dev data/lang exp/tri6 exp/tri6_ali_dev || exit 1;
 fi
 
-
 echo "local/run_gmm.sh succeeded"
 exit 0;

@@ -1,10 +1,15 @@
 #!/bin/bash
 
+# Copyright 2018 AIShell-Foundation(Authors:Jiayu DU, Xingyu NA, Bengu WU, Hao ZHENG)
+#           2018 Beijing Shell Shell Tech. Co. Ltd. (Author: Hui BU)
+#           2018 Emotech LTD (Author: Xuechen LIU)
+# Apache 2.0
+
 trn_set=
 dev_set=
 tst_set=
 
-stage=2
+stage=1
 
 . ./cmd.sh
 . ./path.sh
@@ -40,7 +45,10 @@ fi
 
 # arpa LM
 if [ $stage -le 4 ]; then
-  local/train_lms.sh data/local/dict/lexicon.txt data/local/train/text data/local/lm || exit 1;
+  local/train_lms.sh \
+      data/local/dict/lexicon.txt \
+      data/local/train/text \
+      data/local/lm || exit 1;
 fi
 
 # G compilation, check LG composition

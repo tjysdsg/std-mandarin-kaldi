@@ -1,4 +1,9 @@
 #!/bin/bash
+# Copyright 2018 AIShell-Foundation(Authors:Jiayu DU, Xingyu NA, Bengu WU, Hao ZHENG)
+#           2018 Beijing Shell Shell Tech. Co. Ltd. (Author: Hui BU)
+# Apache 2.0
+
+# transform raw AISHELL-2 data to kaldi format
 
 . ./path.sh || exit 1;
 
@@ -37,17 +42,18 @@ awk -F'\t' -v path_prefix=$corpus '{printf("%s\t%s/%s\n",$1,path_prefix,$2)}' $c
 utils/filter_scp.pl -f 1 $tmp/utt.list $tmp/tmp_wav.scp | sort -k 1 | uniq > $tmp/wav.scp
 
 # text
-python -c "import jieba" 2>/dev/null || (echo "jieba is not found. Use tools/extra/install_jieba.sh to install it." && exit 1;)
+python -c "import jieba" 2>/dev/null || \
+  (echo "jieba is not found. Use tools/extra/install_jieba.sh to install it." && exit 1;)
 utils/filter_scp.pl -f 1 $tmp/utt.list $corpus/trans.txt | sort -k 1 | uniq > $tmp/trans.txt
 # jieba's vocab format requires word count(frequency), set to 99
 awk '{print $1}' $dict_dir/lexicon.txt | sort | uniq | awk '{print $1,99}'> $tmp/word_seg_vocab.txt
 python local/word_segmentation.py $tmp/word_seg_vocab.txt $tmp/trans.txt > $tmp/text
 
 # utt2spk & spk2utt
-# awk -F'\t' '{print $2}' $tmp/wav.scp > $tmp/wav.list
-# sed -e 's:\.wav::g' $tmp/wav.list | awk -F'/' '{i=NF-1;printf("%s\t%s\n",$NF,$i)}' > $tmp/tmp_utt2spk
-# utils/filter_scp.pl -f 1 $tmp/utt.list $tmp/tmp_utt2spk | sort -k 1 | uniq > $tmp/utt2spk
-cat $corpus/utt2spk | sort -k 1 > $tmp/utt2spk
+awk -F'\t' '{print $2}' $tmp/wav.scp > $tmp/wav.list
+sed -e 's:\.wav::g' $tmp/wav.list | \
+  awk -F'/' '{i=NF-1;printf("%s\t%s\n",$NF,$i)}' > $tmp/tmp_utt2spk
+utils/filter_scp.pl -f 1 $tmp/utt.list $tmp/tmp_utt2spk | sort -k 1 | uniq > $tmp/utt2spk
 utils/utt2spk_to_spk2utt.pl $tmp/utt2spk | sort -k 1 | uniq > $tmp/spk2utt
 
 # copy prepared resources from tmp_dir to target dir
