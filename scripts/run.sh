@@ -14,7 +14,7 @@ dev_set=$(pwd)/../data/dev
 tst_set=$(pwd)/../data/test
 
 nj=20
-stage=8
+stage=9
 
 . ./cmd.sh
 . ./path.sh
@@ -121,5 +121,7 @@ fi
 
 # getting results (see RESULTS file)
 for x in exp/*/decode_test; do [ -d $x ] && grep WER $x/cer_* | utils/best_wer.sh; done 2>/dev/null
+
+grep WER exp/nnet3/tdnn_sp/decode_test/cer_* | utils/best_wer.sh
 
 exit 0;
