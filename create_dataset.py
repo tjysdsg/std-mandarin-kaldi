@@ -1,6 +1,8 @@
 import os
 from sklearn.model_selection import train_test_split
+from os.path import abspath, dirname
 
+PROJECT_ROOT_DIR = dirname(abspath(__file__))
 
 datasets = ['aishell2', 'magicdata']
 spk_id_from_utt = {'aishell2': lambda x: x[1:6], 'magicdata': lambda x: x[:7]}
@@ -14,7 +16,7 @@ for d in datasets:
         for line in f:
             tokens = line.split()
             utt = tokens[0]
-            wavscp[utt] = os.path.join('..', '..', d, tokens[1])
+            wavscp[utt] = os.path.join(PROJECT_ROOT_DIR, d, tokens[1])
             spk_id = spk_id_from_utt[d](utt)
             utt2spk[utt] = spk_id
 
