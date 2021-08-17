@@ -38,7 +38,7 @@ awk '{print $1}' $corpus/trans.txt > $tmp/trans_utt.list
 utils/filter_scp.pl -f 1 $tmp/wav_utt.list $tmp/trans_utt.list > $tmp/utt.list
 
 # wav.scp
-awk -F'\t' -v path_prefix=$corpus '{printf("%s\t%s/%s\n",$1,path_prefix,$2)}' $corpus/wav.scp > $tmp/tmp_wav.scp
+cp $corpus/wav.scp $tmp/tmp_wav.scp
 utils/filter_scp.pl -f 1 $tmp/utt.list $tmp/tmp_wav.scp | sort -k 1 | uniq > $tmp/wav.scp
 
 # text
