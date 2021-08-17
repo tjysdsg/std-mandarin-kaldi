@@ -1,0 +1,1 @@
+1. Run `generate_data.sh` to generate a subset of the aishell2+magicdata consisting of (relatively) standard Mandarin

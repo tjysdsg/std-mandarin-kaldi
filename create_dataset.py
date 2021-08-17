@@ -2,8 +2,7 @@ import os
 from sklearn.model_selection import train_test_split
 
 
-# datasets = ['aishell2', 'magicdata']
-datasets = ['aishell2']
+datasets = ['aishell2', 'magicdata']
 spk_id_from_utt = {'aishell2': lambda x: x[1:6], 'magicdata': lambda x: x[:7]}
 
 wavscp = dict()
