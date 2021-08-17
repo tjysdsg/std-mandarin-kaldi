@@ -14,7 +14,7 @@ dev_set=$(pwd)/../data/dev
 tst_set=$(pwd)/../data/test
 
 nj=20
-stage=9
+stage=1
 
 . ./cmd.sh
 . ./path.sh
@@ -41,7 +41,7 @@ if [ $stage -le 3 ]; then
   utils/mkgraph.sh data/lang_test exp/mono exp/mono/graph || exit 1;
   steps/decode.sh --cmd "$decode_cmd" --config conf/decode.config --nj 10 exp/mono/graph data/dev exp/mono/decode_dev
   steps/decode.sh --cmd "$decode_cmd" --config conf/decode.config --nj 10 exp/mono/graph data/test exp/mono/decode_test
-  
+
   # Get alignments from monophone system.
   steps/align_si.sh --cmd "$train_cmd" --nj 10 data/train data/lang exp/mono exp/mono_ali || exit 1;
 fi

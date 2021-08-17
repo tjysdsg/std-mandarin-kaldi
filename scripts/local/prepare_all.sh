@@ -39,7 +39,7 @@ fi
 
 # L
 if [ $stage -le 3 ]; then
-  utils/prepare_lang.sh --position-dependent-phones false \
+  utils/prepare_lang.sh --position-dependent-phones true \
     data/local/dict "<UNK>" data/local/lang data/lang || exit 1;
 fi
 
